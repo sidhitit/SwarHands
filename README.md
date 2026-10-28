@@ -31,6 +31,15 @@ throw your move. First to 2 wins (best of 3). Your opponent is a white cartoon g
 - Gesture rules: `games/rps/RpsGesture.kt` (`OPEN_RATIO` tunes how straight a finger must be)
 - Timings: constants at the bottom of `games/rps/RpsGame.kt`
 
+**Bullseye 🎯**: pick a weapon, then 3 stages × 5 shots (still target → moving target → wind). Rings score 10/8/6/4/2.
+- **Slingshot (one hand)**: pinch thumb + index, pull down to stretch the band, open the pinch to shoot.
+- **Bow (two hands)**: the bow slides along a fixed line; steer it left/right with one hand's two fingers ✌ and lean those fingers to tilt it up to ~50° each way.
+  With the other hand pinch the red dot on the string, pull down, open the pinch to shoot. Arrows fly straight up.
+- Pull distance = power. The green zone (80–95%) lands near the centre. Past 100% the weapon shakes
+  and the shot gets random error; holding a full bow draw too long makes your arm tremble too.
+- Gestures: `games/bullseye/AimTracker.kt` (`PINCH_ON` / `PINCH_OFF`, reach multipliers)
+- Scoring, stages and power/shake tuning: constants in `games/bullseye/BullseyeGame.kt`
+
 ## Tuning
 - Pinch sensitivity: `PinchDetector(pinchOnRatio, pinchOffRatio)` in `gesture/PinchDetector.kt`.
 - Key band position: `TOP` / `BOTTOM` in `gesture/AirKeyboard.kt`.

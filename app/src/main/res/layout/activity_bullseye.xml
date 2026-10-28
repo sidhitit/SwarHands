@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
+
+    <com.demo.swarhands.games.bullseye.BullseyeView
+        android:id="@+id/gameView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_pill"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/gameOverButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPlayAgain"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:backgroundTint="#FFD54F"
+            android:text="@string/play_again"
+            android:textColor="#1A1A1A"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBack"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:text="@string/games"
+                android:textColor="@android:color/white"
+                app:strokeColor="#80FFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSwitch"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/switch_weapon"
+                android:textColor="@android:color/white"
+                app:strokeColor="#80FFFFFF" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Weapon picker (shown first, before the camera starts) -->
+    <LinearLayout
+        android:id="@+id/picker"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_home"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-black"
+            android:text="@string/bullseye_title"
+            android:textColor="@android:color/white"
+            android:textSize="34sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/choose_weapon"
+            android:textColor="#B0B3C6"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardBow"
+                style="@style/WeaponCard"
+                android:layout_marginEnd="6dp">
+
+                <LinearLayout style="@style/WeaponCardBody">
+
+                    <com.demo.swarhands.games.bullseye.WeaponIconView
+                        android:id="@+id/iconBow"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp" />
+
+                    <TextView
+                        style="@style/WeaponTitle"
+                        android:text="@string/weapon_bow" />
+
+                    <TextView
+                        style="@style/WeaponBadge"
+                        android:text="@string/two_hands" />
+
+                    <TextView
+                        style="@style/WeaponDesc"
+                        android:text="@string/bow_desc" />
+
+                    <TextView
+                        android:id="@+id/bestBow"
+                        style="@style/WeaponBest" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardSling"
+                style="@style/WeaponCard"
+                android:layout_marginStart="6dp">
+
+                <LinearLayout style="@style/WeaponCardBody">
+
+                    <com.demo.swarhands.games.bullseye.WeaponIconView
+                        android:id="@+id/iconSling"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp" />
+
+                    <TextView
+                        style="@style/WeaponTitle"
+                        android:text="@string/weapon_sling" />
+
+                    <TextView
+                        style="@style/WeaponBadge"
+                        android:text="@string/one_hand" />
+
+                    <TextView
+                        style="@style/WeaponDesc"
+                        android:text="@string/sling_desc" />
+
+                    <TextView
+                        android:id="@+id/bestSling"
+                        style="@style/WeaponBest" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="@string/power_tip"
+            android:textColor="#9EA2B8"
+            android:textSize="13sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPickerBack"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/games"
+            android:textColor="#B0B3C6" />
+    </LinearLayout>
+</FrameLayout>

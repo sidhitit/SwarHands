@@ -26,5 +26,9 @@
             android:name=".games.rps.RpsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".games.bullseye.BullseyeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>

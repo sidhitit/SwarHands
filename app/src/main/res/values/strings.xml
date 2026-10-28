@@ -11,4 +11,14 @@
     <string name="badge_soon">SOON</string>
     <string name="play_again">Play again</string>
     <string name="games">Games</string>
+    <string name="bullseye_title">Bullseye 🎯</string>
+    <string name="choose_weapon">Choose your weapon</string>
+    <string name="weapon_bow">Bow &amp; Arrow</string>
+    <string name="weapon_sling">Slingshot</string>
+    <string name="two_hands">TWO HANDS</string>
+    <string name="one_hand">ONE HAND</string>
+    <string name="bow_desc">Slide and tilt two fingers ✌ to aim the bow. Pinch the red dot with your other hand, pull down, let go.</string>
+    <string name="sling_desc">Pinch thumb + index, pull down to stretch the band, let go.</string>
+    <string name="power_tip">Pull into the green zone for perfect power.\nPull too far and your aim starts to shake!</string>
+    <string name="switch_weapon">Switch weapon</string>
 </resources>
