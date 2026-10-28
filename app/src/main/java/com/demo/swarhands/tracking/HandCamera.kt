@@ -1,10 +1,13 @@
 package com.demo.swarhands.tracking
 
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
+import android.util.Log
 import android.util.Range
 import android.util.Size
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
@@ -59,12 +62,13 @@ class HandCamera(
         providerFuture.addListener({
             val provider = providerFuture.get()
             val ratio = AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
-            val fps30 = Range(30, 30)
+            val fps = bestFpsRange(provider)
+            Log.i(TAG, "Front camera fps range: $fps")
 
             val previewBuilder = Preview.Builder()
                 .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(ratio).build())
             Camera2Interop.Extender(previewBuilder)
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps30)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps)
             val preview = previewBuilder.build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
             val analysisBuilder = ImageAnalysis.Builder()
@@ -79,7 +83,7 @@ class HandCamera(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             Camera2Interop.Extender(analysisBuilder)
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps30)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps)
             val analysis = analysisBuilder.build()
 
             analysis.setAnalyzer(executor) { proxy ->
@@ -96,11 +100,36 @@ class HandCamera(
         }, ContextCompat.getMainExecutor(activity))
     }
 
+    /**
+     * 60 fps when the front camera supports it (smoother, lower-latency tracking),
+     * otherwise a steady 30. Asking for a rate the camera lacks can fail to start it.
+     */
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun bestFpsRange(provider: ProcessCameraProvider): Range<Int> {
+        val ranges = try {
+            CameraSelector.DEFAULT_FRONT_CAMERA.filter(provider.availableCameraInfos).firstOrNull()?.let {
+                Camera2CameraInfo.from(it).getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+            }
+        } catch (e: Exception) {
+            null
+        }
+        if (ranges.isNullOrEmpty()) return Range(30, 30)
+        return ranges.firstOrNull { it.lower == 60 && it.upper == 60 }
+            ?: ranges.filter { it.upper == 60 }.maxByOrNull { it.lower }
+            ?: ranges.firstOrNull { it.lower == 30 && it.upper == 30 }
+            ?: ranges.filter { it.upper <= 30 }.maxWithOrNull(compareBy<Range<Int>>({ it.upper }, { it.lower }))
+            ?: Range(30, 30)
+    }
+
     fun release() {
         executor.execute {
             tracker?.close()
             tracker = null
         }
         executor.shutdown()
+    }
+
+    private companion object {
+        const val TAG = "HandCamera"
     }
 }

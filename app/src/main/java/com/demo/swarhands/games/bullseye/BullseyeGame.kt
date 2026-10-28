@@ -27,6 +27,8 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
         fun onHaptic(strong: Boolean)
         fun onPhaseChanged(phase: Phase)
         fun onLanded()
+        /** The shot clock ran out and the game fired for the player: drop their draw. */
+        fun onAutoFired()
     }
 
     enum class Phase { INTRO, AIM, FLIGHT, RESULT, STAGE_CLEAR, GAME_OVER }
@@ -76,6 +78,8 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
     var hitOy = 0f; private set
     /** Missed above or to the side: the projectile keeps flying past the target. */
     var flyOn = false; private set
+    /** The shot clock fired this shot. */
+    var timedOut = false; private set
 
     // ---------- marks left on the target this stage (in target radii) ----------
     val stuckX = FloatArray(SHOTS)
@@ -90,6 +94,10 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
     private var overNotified = false
     private var overSince = 0L
     private var fullSince = 0L
+    private var lastTickSec = 0
+
+    /** Milliseconds left on the shot clock (only meaningful while aiming). */
+    fun timeLeft(now: Long): Long = (SHOT_TIME_MS - (now - phaseStart)).coerceAtLeast(0L)
 
     fun layout(width: Float, height: Float, dp: Float) {
         w = width
@@ -126,7 +134,7 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
             val fresh = lastSeq != Int.MIN_VALUE
             lastSeq = aim.releaseSeq
             val shot = aim.shot
-            if (fresh && phase == Phase.AIM && shot != null) fire(shot, now)
+            if (fresh && phase == Phase.AIM && shot != null) fire(shot, now, auto = false)
         }
         val t = now - phaseStart
         when (phase) {
@@ -143,6 +151,18 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
     // ---------------------------------------------------------------- aiming
 
     private fun updateAim(now: Long, aim: AimState?) {
+        val left = timeLeft(now)
+        if (left == 0L) {
+            autoFire(now, aim)
+            return
+        }
+        // countdown ticks for the last few seconds
+        val sec = ((left + 999) / 1000).toInt()
+        if (sec <= TICK_FROM_S && sec != lastTickSec) {
+            lastTickSec = sec
+            listener.onSfx(Sfx.TICK, 0.6f, if (sec == 1) 1.4f else 1f)
+        }
+
         if (aim == null || !aim.drawing) {
             shake *= 0.85f
             stretchStep = 0
@@ -201,7 +221,20 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
 
     // ---------------------------------------------------------------- shooting
 
-    private fun fire(shot: Shot, now: Long) {
+    /** Time's up: shoot whatever the player is holding; with nothing drawn the shot just drops. */
+    private fun autoFire(now: Long, aim: AimState?) {
+        val drawn = aim != null && aim.drawing
+        val shot = if (drawn) {
+            Shot(aim!!.power, aim.dirX, aim.dirY, aim.gripX, aim.gripY)
+        } else {
+            Shot(0f, 0f, -1f, aim?.gripX ?: slingX, aim?.gripY ?: slingY)
+        }
+        listener.onAutoFired()
+        fire(shot, now, auto = true)
+    }
+
+    private fun fire(shot: Shot, now: Long, auto: Boolean) {
+        timedOut = auto
         val err = shake
         shotShake = err
         val pEff = (min(shot.power, 1f) + (Random.nextFloat() * 2f - 1f) * err * 0.14f).coerceAtLeast(0f)
@@ -326,6 +359,7 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
     private fun enter(p: Phase, now: Long) {
         phase = p
         phaseStart = now
+        lastTickSec = 0
         listener.onPhaseChanged(p)
     }
 
@@ -347,6 +381,9 @@ class BullseyeGame(val weapon: Weapon, var best: Int, private val listener: List
         const val INTRO_MS = 2000L
         const val RESULT_MS = 1100L
         const val STAGE_CLEAR_MS = 2200L
+        const val SHOT_TIME_MS = 15_000L     // per shot; then it fires on its own
+        const val WARN_MS = 5_000L            // the clock turns red
+        private const val TICK_FROM_S = 3
         private const val SHORT_POWER = 0.5f
         private const val VERT_K = 6.5f       // target radii per unit of power off the sweet spot
         private const val WIND_K = 1.3f       // target radii of drift at full wind

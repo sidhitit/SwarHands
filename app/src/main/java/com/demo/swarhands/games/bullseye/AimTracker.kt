@@ -9,6 +9,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sin
 
@@ -39,8 +40,10 @@ class AimState(
  * Bow (2 hands): the bow slides along a fixed line, steered left/right by one hand's two
  *   fingers and rotated up to ~50 degrees each way by leaning those fingers (wrist still).
  *   The other hand pinches the string at the bow and pulls down; the arrow flies where the bow points.
- * Release = open the pinch. The shot uses the aim from a couple of frames earlier, because
- * opening the fingers shifts the pinch point and would otherwise yank the aim.
+ * Release = open the pinch and keep it open for [RELEASE_CONFIRM_MS], so a single noisy frame
+ * never lets go by accident. The shot uses the aim from just before the fingers started to
+ * open, because opening them shifts the pinch point and would otherwise yank the aim.
+ * Everything is timed in milliseconds, so it behaves the same at 30 or 60 fps.
  */
 class AimTracker(private val weapon: Weapon) {
 
@@ -58,23 +61,36 @@ class AimTracker(private val weapon: Weapon) {
         val twoUp = pts[8].y < pts[6].y && pts[12].y < pts[10].y && pts[16].y > pts[14].y
     }
 
-    /** Light adaptive smoothing: steady when still, responsive when moving fast. */
+    /**
+     * Light adaptive smoothing: steady when still, responsive when moving fast.
+     * Tuned per 30 fps frame; [k] = elapsed frames at that rate keeps it the same at 60 fps.
+     */
     private class Smooth {
         var x = 0f
         var y = 0f
         var has = false
-        fun push(px: Float, py: Float, scale: Float) {
+        fun push(px: Float, py: Float, scale: Float, k: Float) {
             if (!has) {
                 x = px; y = py; has = true
                 return
             }
-            val a = (0.3f + hypot(px - x, py - y) / scale * 2.5f).coerceIn(0.3f, 0.85f)
+            val a0 = (0.3f + hypot(px - x, py - y) / scale * 2.5f).coerceIn(0.3f, 0.85f)
+            val a = 1f - (1f - a0).pow(k)
             x += (px - x) * a
             y += (py - y) * a
         }
     }
 
+    /** Asked from the UI thread: drop the current draw (the game fired it for you). */
+    @Volatile private var cancelRequested = false
+
     private var drawing = false
+    /** After a cancel, a new draw needs the fingers opened first. */
+    private var needOpen = false
+    /** When the pinch started opening during a draw, 0 = still pinched. */
+    private var openSince = 0L
+    private var lastAt = 0L
+    private var k = 1f
     private var lostSince = 0L
     private var originX = 0f
     private var originY = 0f
@@ -92,16 +108,30 @@ class AimTracker(private val weapon: Weapon) {
     private var pullX = 0f
     private var pullY = 0f
 
-    // ring buffer: power, dirX, dirY, fromX, fromY
+    // ring buffer: power, dirX, dirY, fromX, fromY (+ when)
     private val hist = Array(HISTORY) { FloatArray(5) }
+    private val histAt = LongArray(HISTORY)
     private var histPos = 0
     private var histCount = 0
 
     private var releaseSeq = 0
     private var lastShot: Shot? = null
 
+    /** Thread-safe. The current draw is dropped on the next frame. */
+    fun cancelDraw() {
+        cancelRequested = true
+    }
+
     fun process(result: HandLandmarkerResult, t: ViewTransform, anchorX: Float, anchorY: Float): AimState {
         val now = SystemClock.uptimeMillis()
+        k = if (lastAt == 0L) 1f else ((now - lastAt) / FRAME_30_MS).coerceIn(0.25f, 3f)
+        lastAt = now
+        if (cancelRequested) {
+            cancelRequested = false
+            drawing = false
+            needOpen = true
+            openSince = 0L
+        }
         val labels = result.handedness()
         val hands = ArrayList<Hand>(2)
         result.landmarks().forEachIndexed { i, lm ->
@@ -110,6 +140,7 @@ class AimTracker(private val weapon: Weapon) {
             }
         }
         val pts = hands.map { it.pts }
+        if (needOpen && hands.none { it.ratio < PINCH_OFF }) needOpen = false
         return if (weapon == Weapon.SLINGSHOT) sling(hands, pts, now, t.viewW, anchorX, anchorY)
         else bow(hands, pts, now, t.viewW, anchorX, anchorY)
     }
@@ -124,19 +155,20 @@ class AimTracker(private val weapon: Weapon) {
             if (drawing && lost(now)) drawing = false
         } else {
             lostSince = 0L
-            if (!drawing && hand.ratio < PINCH_ON) {
+            if (!drawing && !needOpen && hand.ratio < PINCH_ON) {
                 drawing = true
+                openSince = 0L
                 originX = hand.pinchX
                 originY = hand.pinchY
                 maxPull = (hand.size * 2.4f).coerceIn(viewW * 0.2f, viewW * 0.45f)
                 pull.has = false
                 histCount = 0
-            } else if (drawing && hand.ratio > PINCH_OFF) {
+            } else if (drawing && letGo(hand, now)) {
                 release()
             }
-            if (drawing) {
-                pull.push(hand.pinchX, hand.pinchY, hand.size)
-                aim(pull.x - originX, pull.y - originY, ax, ay)
+            if (drawing && openSince == 0L) {
+                pull.push(hand.pinchX, hand.pinchY, hand.size, k)
+                aim(pull.x - originX, pull.y - originY, ax, ay, now)
             }
         }
         if (!drawing) rest(ax, ay)
@@ -157,11 +189,12 @@ class AimTracker(private val weapon: Weapon) {
         if (!drawing) {
             steerHand(hands)?.let { steerWith(it) }
             val bx = bowX(bx0, minX, maxX)
-            if (hands.size == 2) {
+            if (hands.size == 2 && !needOpen) {
                 // nock: a pinch close to the string (the red dot under the bow)
                 for (d in hands) {
                     if (d.ratio < PINCH_ON && hypot(d.pinchX - bx, d.pinchY - by) < maxOf(d.size * 2f, viewW * 0.18f)) {
                         drawing = true
+                        openSince = 0L
                         originY = d.pinchY
                         maxPull = (d.size * 2.4f).coerceIn(viewW * 0.2f, viewW * 0.45f)
                         lastDrawX = d.pinchX
@@ -193,24 +226,38 @@ class AimTracker(private val weapon: Weapon) {
         val b = if (d === hands[0]) hands[1] else hands[0]
         steerWith(b)
         val x = bowX(bx0, minX, maxX)
-        if (d.ratio > PINCH_OFF) {
+        if (letGo(d, now)) {
             release()
             restTilted(x, by)
             return state(pts, true, x, by)
         }
         lastDrawX = d.pinchX
         lastDrawY = d.pinchY
-        pull.push(d.pinchX, d.pinchY, d.size)
-        aimAlong(maxOf(0f, pull.y - originY), x, by) // only pulling down counts
+        if (openSince != 0L) return state(pts, true, x, by) // fingers opening: hold the aim
+        pull.push(d.pinchX, d.pinchY, d.size, k)
+        aimAlong(maxOf(0f, pull.y - originY), x, by, now) // only pulling down counts
         return state(pts, true, x, by)
+    }
+
+    /**
+     * True once the pinch has stayed open for [RELEASE_CONFIRM_MS]. A brief flicker
+     * (tracking noise, a finger hidden for a frame) re-pinches and keeps the draw.
+     */
+    private fun letGo(h: Hand, now: Long): Boolean {
+        if (h.ratio <= PINCH_OFF) {
+            openSince = 0L
+            return false
+        }
+        if (openSince == 0L) openSince = now
+        return now - openSince >= RELEASE_CONFIRM_MS
     }
 
     /** Slide the bow with the two fingers' position, rotate it with their lean (up to ±[MAX_TILT]). */
     private fun steerWith(h: Hand) {
-        steer.push(h.steerX, 0f, h.size)
+        steer.push(h.steerX, 0f, h.size, k)
         var a = h.tilt.coerceIn(-MAX_TILT, MAX_TILT)
         a = if (abs(a) < TILT_DEAD_ZONE) 0f else a - sign(a) * TILT_DEAD_ZONE // easy straight shots
-        tilt.push(a * MAX_TILT / (MAX_TILT - TILT_DEAD_ZONE), 0f, 1f)
+        tilt.push(a * MAX_TILT / (MAX_TILT - TILT_DEAD_ZONE), 0f, 1f, k)
     }
 
     private fun bowDir() {
@@ -225,13 +272,13 @@ class AimTracker(private val weapon: Weapon) {
     }
 
     /** Bow: [dist] pulled down -> power; the arrow points where the bow is tilted. */
-    private fun aimAlong(dist: Float, bx: Float, by: Float) {
+    private fun aimAlong(dist: Float, bx: Float, by: Float, now: Long) {
         bowDir()
         power = min(dist / maxPull, MAX_POWER)
         val shown = min(dist, maxPull * MAX_POWER)
         pullX = bx - dirX * shown
         pullY = by - dirY * shown
-        pushHistory(bx, by)
+        pushHistory(bx, by, now)
     }
 
     private fun bowX(fallback: Float, minX: Float, maxX: Float) =
@@ -267,7 +314,7 @@ class AimTracker(private val weapon: Weapon) {
     }
 
     /** Pull vector (vx, vy) measured from the base point (bx, by) -> power, direction, pouch/nock. */
-    private fun aim(vx: Float, vy: Float, bx: Float, by: Float) {
+    private fun aim(vx: Float, vy: Float, bx: Float, by: Float, now: Long) {
         val len = hypot(vx, vy)
         power = min(len / maxPull, MAX_POWER)
         if (len > 1f) {
@@ -277,12 +324,13 @@ class AimTracker(private val weapon: Weapon) {
         val shown = min(len, maxPull * MAX_POWER)
         pullX = bx - dirX * shown
         pullY = by - dirY * shown
-        pushHistory(bx, by)
+        pushHistory(bx, by, now)
     }
 
-    private fun pushHistory(bx: Float, by: Float) {
+    private fun pushHistory(bx: Float, by: Float, now: Long) {
         val h = hist[histPos]
         h[0] = power; h[1] = dirX; h[2] = dirY; h[3] = bx; h[4] = by
+        histAt[histPos] = now
         histPos = (histPos + 1) % HISTORY
         histCount = min(histCount + 1, HISTORY)
     }
@@ -297,9 +345,17 @@ class AimTracker(private val weapon: Weapon) {
 
     private fun release() {
         drawing = false
+        val opened = openSince
+        openSince = 0L
         if (histCount == 0) return
-        val back = min(histCount, RELEASE_LOOKBACK)
-        val h = hist[(histPos - back + HISTORY) % HISTORY]
+        // newest aim from at least RELEASE_LOOKBACK_MS before the fingers began to open
+        val cutoff = opened - RELEASE_LOOKBACK_MS
+        var idx = (histPos - 1 + HISTORY) % HISTORY
+        for (i in 1 until histCount) {
+            if (histAt[idx] <= cutoff) break
+            idx = (idx - 1 + HISTORY) % HISTORY
+        }
+        val h = hist[idx]
         if (h[0] < MIN_SHOT_POWER) return // barely pulled: just let go, no shot wasted
         releaseSeq++
         lastShot = Shot(h[0], h[1], h[2], h[3], h[4])
@@ -317,9 +373,11 @@ class AimTracker(private val weapon: Weapon) {
         private const val TILT_DEAD_ZONE = 0.07f  // ~4 degrees
         private const val PINCH_ON = 0.33f
         private const val PINCH_OFF = 0.48f
-        private const val LOST_MS = 350L
+        private const val LOST_MS = 1000L             // hand out of view this long drops the draw
         private const val MIN_SHOT_POWER = 0.15f
-        private const val HISTORY = 6
-        private const val RELEASE_LOOKBACK = 2
+        private const val RELEASE_CONFIRM_MS = 90L    // pinch must stay open this long to shoot
+        private const val RELEASE_LOOKBACK_MS = 50L
+        private const val HISTORY = 24                // ~400 ms at 60 fps
+        private const val FRAME_30_MS = 1000f / 30f
     }
 }

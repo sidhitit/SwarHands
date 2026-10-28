@@ -39,6 +39,27 @@ throw your move. First to 2 wins (best of 3). Your opponent is a white cartoon g
   and the shot gets random error; holding a full bow draw too long makes your arm tremble too.
 - Gestures: `games/bullseye/AimTracker.kt` (`PINCH_ON` / `PINCH_OFF`, reach multipliers)
 - Scoring, stages and power/shake tuning: constants in `games/bullseye/BullseyeGame.kt`
+- Each shot has a 15 s clock; when it runs out the game shoots whatever you're holding.
+
+**Gully Cricket 🏏**: one hand is your bat. Watch the bowler run in, swing as the ball reaches the crease.
+- Timing picks the direction (early = leg side, late = off side), swing speed is power, an upward swing lofts it.
+- Lofted and well timed = SIX (slow-mo replay). Mistimed lofts get caught; lofted side shots hit the houses:
+  break a window and you're out (gully rule), hit the glowing golden window for +10.
+- Ball types: medium, fast, slower ball (same run-up as medium), spin, bouncer, yorker. The run-up gives a hint.
+- **Chase**: 5 levels, e.g. 12 off 6 balls up to 36 off 12. **Super Over**: bat until you lose 2 wickets, quicker every over.
+- Swing detection: `games/cricket/BatTracker.kt` (`SWING_ON`, `POWER_FULL`)
+- Timing window, latency, levels and shot outcomes: constants in `games/cricket/CricketGame.kt`
+
+**Sign Says 🖐️**: a Simon-style memory game with hand signs. Watch the cards, then repeat them in order.
+- Hold each sign until the ring fills to lock it in. Each sign plays its own sargam note.
+- Every cleared round adds one sign; harder signs unlock later (round 3, 5, 7) and the cards speed up. 3 lives; a wrong sign
+  or 7 s without one costs a life and replays the round.
+- Signs: 1–5 fingers, fist, 👍, 👎, 🤘, 🤙, 👌, plus two-hand 6–10 (5 + n) and the 🫶 heart.
+  Reading them: `games/signs/Sign.kt` (`SignClassifier`). Hands cut off by the screen edge are ignored.
+- Shapes (○ □ △ ⚡ ★) are drawn in the air with one pointing finger; hold still to finish.
+  A held, still ☝ is the "One" sign, a moving one draws. Recognizer: `games/signs/ShapeRecognizer.kt`
+  ($1-style template matching, plus a corner count to tell squares from circles).
+- Rounds, timings and scoring: constants in `games/signs/SignGame.kt`
 
 ## Tuning
 - Pinch sensitivity: `PinchDetector(pinchOnRatio, pinchOffRatio)` in `gesture/PinchDetector.kt`.

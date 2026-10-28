@@ -46,6 +46,8 @@ class BullseyeView @JvmOverloads constructor(
 
     var sfx: SfxPlayer? = null
     var onPhaseChanged: ((Phase) -> Unit)? = null
+    /** Called on the UI thread when the shot clock fires the shot for the player. */
+    var onAutoFired: (() -> Unit)? = null
     var game: BullseyeGame? = null
         private set
 
@@ -207,6 +209,10 @@ class BullseyeView @JvmOverloads constructor(
         post { onPhaseChanged?.invoke(phase) } // never touch other views mid-draw
     }
 
+    override fun onAutoFired() {
+        onAutoFired?.invoke()
+    }
+
     override fun onLanded() {
         val g = game ?: return
         streakStr = if (g.streak >= 2) "🔥 ${g.streak} IN A ROW" else ""
@@ -339,7 +345,10 @@ class BullseyeView @JvmOverloads constructor(
             Phase.GAME_OVER -> drawGameOver(c, g, now, t, w, h)
             else -> Unit
         }
-        if (phase == Phase.AIM) drawHint(c, g, a, w, h, now)
+        if (phase == Phase.AIM) {
+            drawClock(c, g, now, w, h)
+            drawHint(c, g, a, w, h, now)
+        }
         if (confettiActive) drawConfetti(c, dt, h)
 
         if (needsAnimation(g, phase, t, a)) postInvalidateOnAnimation()
@@ -347,8 +356,7 @@ class BullseyeView @JvmOverloads constructor(
 
     private fun needsAnimation(g: BullseyeGame, phase: Phase, t: Long, a: AimState?): Boolean = when (phase) {
         Phase.INTRO, Phase.FLIGHT, Phase.RESULT, Phase.STAGE_CLEAR -> true
-        Phase.AIM -> g.stage.moving || g.stage.windy || a?.drawing == true || sparksActive || g.shake > 0.01f ||
-            g.weapon == Weapon.BOW // the pinch dot pulses
+        Phase.AIM -> true // the shot clock counts down
         Phase.GAME_OVER -> t < 3000 || confettiActive
     }
 
@@ -751,7 +759,11 @@ class BullseyeView @JvmOverloads constructor(
         val alpha = if (t > BullseyeGame.RESULT_MS - 250) ((BullseyeGame.RESULT_MS - t) / 250f * 255).toInt() else 255
         val y = g.targetY - r * 1.25f - dp(26f) - lift
         text(c, big, tx.coerceIn(dp(90f), width - dp(90f)), y, sp(if (g.points == 10) 40f else 32f), color, alpha, 0.5f + 0.5f * easeOutBack(p))
-        val sub = if (g.shotShake > 0.45f && g.points < 8) "Too much power, it shook!" else small
+        val sub = when {
+            g.timedOut -> TIME_UP
+            g.shotShake > 0.45f && g.points < 8 -> "Too much power, it shook!"
+            else -> small
+        }
         if (sub.isNotEmpty()) text(c, sub, width / 2f, y + dp(32f), sp(14f), if (sub === small) Color.WHITE else LOSE_RED, alpha)
         if (streakStr.isNotEmpty() && g.outcome == Outcome.HIT) {
             text(c, streakStr, width / 2f, y + dp(56f), sp(13f), GOLD, alpha)
@@ -803,6 +815,32 @@ class BullseyeView @JvmOverloads constructor(
             } else {
                 text(c, bestStr, w / 2f, cy + dp(100f), sp(16f), SOFT_WHITE, (p3 * 255).toInt())
             }
+        }
+    }
+
+    /** Shot clock: a bar under the HUD that drains over 15 s, plus big seconds in the last 5. */
+    private fun drawClock(c: Canvas, g: BullseyeGame, now: Long, w: Float, h: Float) {
+        val left = g.timeLeft(now)
+        val frac = left / BullseyeGame.SHOT_TIME_MS.toFloat()
+        val warn = left <= BullseyeGame.WARN_MS
+        val x0 = dp(28f)
+        val x1 = w - dp(28f)
+        val y = barBottom + dp(6f)
+        strokePaint.strokeWidth = dp(4f)
+        strokePaint.color = Color.argb(70, 255, 255, 255)
+        c.drawLine(x0, y, x1, y, strokePaint)
+        strokePaint.color = when {
+            warn -> LOSE_RED
+            frac < 0.6f -> GOLD
+            else -> WIN_GREEN
+        }
+        c.drawLine(x0, y, x0 + (x1 - x0) * frac, y, strokePaint)
+
+        if (warn) {
+            val sec = ((left + 999) / 1000).toInt().coerceIn(1, CLOCK_NUM.size - 1)
+            val inSec = 1f - (left % 1000) / 1000f // 0 -> 1 through each second
+            val alpha = (230 * (1f - inSec * 0.6f)).toInt()
+            text(c, CLOCK_NUM[sec], w / 2f, h * 0.56f, sp(56f), LOSE_RED, alpha, 1.25f - 0.25f * easeOutCubic(inSec))
         }
     }
 
@@ -955,6 +993,8 @@ class BullseyeView @JvmOverloads constructor(
     private companion object {
         val PERCENT = Array(131) { "$it%" }
         val STAGE_NUM = arrayOf("1/3", "2/3", "3/3")
+        val CLOCK_NUM = Array(6) { it.toString() }
+        const val TIME_UP = "Time's up! It fired on its own"
         val POINTS = arrayOf("", "+2", "+4", "+6", "+8", "+10")
         val LABELS = arrayOf("", "EDGE", "OK", "GOOD", "GREAT!", "BULLSEYE!")
         val GOLD = Color.parseColor("#FFD54F")

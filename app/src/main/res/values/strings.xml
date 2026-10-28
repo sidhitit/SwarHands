@@ -21,4 +21,15 @@
     <string name="sling_desc">Pinch thumb + index, pull down to stretch the band, let go.</string>
     <string name="power_tip">Pull into the green zone for perfect power.\nPull too far and your aim starts to shake!</string>
     <string name="switch_weapon">Switch weapon</string>
+    <string name="cricket_title">Gully Cricket 🏏</string>
+    <string name="choose_mode">Choose a mode</string>
+    <string name="mode_chase">Chase</string>
+    <string name="mode_super">Super Over</string>
+    <string name="badge_levels">5 LEVELS</string>
+    <string name="badge_endless">ENDLESS</string>
+    <string name="chase_desc">Chase a target off a few balls. Each level adds pace, spin, bouncers and yorkers.</string>
+    <string name="super_desc">Bat until you lose 2 wickets. The bowling gets quicker every over.</string>
+    <string name="cricket_tip">Hold your hand up like a bat ✋ and swing as the ball reaches you.\nEarly = leg side, late = off side. Swing upwards to loft it for six!</string>
+    <string name="switch_mode">Switch mode</string>
+    <string name="try_again">Try again</string>
 </resources>

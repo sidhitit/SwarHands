@@ -17,7 +17,9 @@ import kotlin.math.sin
 enum class Sfx {
     TICK, BEAT, SHOOT, ROUND_WIN, ROUND_LOSE, DRAW, GAME_WIN, GAME_LOSE,
     // Bullseye
-    STRETCH, CREAK, SNAP, TWANG, THUNK, KNOCK, BULLSEYE, MISS, OVERPOWER
+    STRETCH, CREAK, SNAP, TWANG, THUNK, KNOCK, BULLSEYE, MISS, OVERPOWER,
+    // Gully Cricket
+    BAT, STUMPS, CHEER, GROAN, GLASS, BOUNCE, SWISH
 }
 
 /** Game sound effects, synthesized once in code and cached (no audio assets). */
@@ -96,6 +98,13 @@ class SfxPlayer(context: Context) {
             )
             Sfx.MISS -> miss()
             Sfx.OVERPOWER -> render(listOf(Note(0.0, 233.08, 0.09), Note(0.12, 233.08, 0.12)), BUZZY, 9.0)
+            Sfx.BAT -> bat()
+            Sfx.STUMPS -> stumps()
+            Sfx.CHEER -> crowd(cheer = true)
+            Sfx.GROAN -> crowd(cheer = false)
+            Sfx.GLASS -> glass()
+            Sfx.BOUNCE -> bounce()
+            Sfx.SWISH -> swish()
         }
 
         private fun samples(sec: Double) = (sec * SAMPLE_RATE).toInt()
@@ -232,6 +241,139 @@ class SfxPlayer(context: Context) {
                 phase += 2 * PI * (55.0 + 60.0 * exp(-t * 30)) / SAMPLE_RATE
                 lp += 0.15 * (rnd.nextGaussian() - lp)
                 buf[i] = (sin(phase) * exp(-t * 14) + 0.6 * lp * exp(-t * 20)).toFloat()
+            }
+            return pcm(buf, 0.7f)
+        }
+
+        /** Willow on leather: a hard click and a short, bright wooden ring. */
+        fun bat(): ShortArray {
+            val n = samples(0.32)
+            val buf = FloatArray(n)
+            val rnd = Random(21)
+            for (i in 0 until n) {
+                val t = i.toDouble() / SAMPLE_RATE
+                val click = rnd.nextGaussian() * exp(-t * 900)
+                val ring = sin(2 * PI * 1180 * t) * exp(-t * 38) +
+                    0.6 * sin(2 * PI * 2390 * t) * exp(-t * 60) +
+                    0.35 * sin(2 * PI * 3720 * t) * exp(-t * 90)
+                val body = sin(2 * PI * 210 * t) * exp(-t * 30)
+                buf[i] = (1.2 * click + ring + 0.7 * body).toFloat()
+            }
+            return pcm(buf, 0.95f)
+        }
+
+        /** Stumps flattened: three wooden knocks tumbling over each other, then the bails rattling. */
+        fun stumps(): ShortArray {
+            val n = samples(0.6)
+            val buf = FloatArray(n)
+            val rnd = Random(23)
+            val hits = doubleArrayOf(0.0, 0.035, 0.08, 0.16, 0.24, 0.31)
+            val pitch = doubleArrayOf(520.0, 610.0, 470.0, 1350.0, 1500.0, 1420.0)
+            val amp = doubleArrayOf(1.0, 0.9, 0.8, 0.45, 0.35, 0.25)
+            for (k in hits.indices) {
+                val s0 = samples(hits[k])
+                for (j in 0 until samples(0.18)) {
+                    val idx = s0 + j
+                    if (idx >= n) break
+                    val t = j.toDouble() / SAMPLE_RATE
+                    val v = sin(2 * PI * pitch[k] * t) * exp(-t * 40) +
+                        0.5 * sin(2 * PI * pitch[k] * 2.7 * t) * exp(-t * 70) +
+                        0.6 * rnd.nextGaussian() * exp(-t * 350)
+                    buf[idx] += (amp[k] * v).toFloat()
+                }
+            }
+            return pcm(buf, 0.95f)
+        }
+
+        /** A small crowd: band-limited roar plus many voices sliding up (cheer) or down (groan). */
+        fun crowd(cheer: Boolean): ShortArray {
+            val dur = if (cheer) 1.9 else 1.3
+            val n = samples(dur)
+            val buf = FloatArray(n)
+            val rnd = Random(if (cheer) 31 else 37)
+            var lp1 = 0.0
+            var lp2 = 0.0
+            for (i in 0 until n) {
+                val t = i.toDouble() / SAMPLE_RATE
+                val x = rnd.nextGaussian()
+                lp1 += 0.18 * (x - lp1)
+                lp2 += 0.03 * (x - lp2)
+                val env = min(1.0, t / 0.12) * exp(-t * (if (cheer) 1.3 else 2.0))
+                buf[i] = ((lp1 - lp2) * 2.2 * env).toFloat() // band-pass: the roar
+            }
+            val voices = if (cheer) 14 else 10
+            for (v in 0 until voices) {
+                val f0 = (if (cheer) 330.0 else 260.0) + rnd.nextDouble() * 320.0
+                val start = rnd.nextDouble() * 0.25
+                val len = dur * (0.55 + 0.4 * rnd.nextDouble())
+                val vib = 4.0 + rnd.nextDouble() * 3.0
+                var ph = 0.0
+                for (j in 0 until samples(len)) {
+                    val idx = samples(start) + j
+                    if (idx >= n) break
+                    val t = j.toDouble() / SAMPLE_RATE
+                    val slide = if (cheer) 1.0 + 0.35 * min(1.0, t / 0.3) else 1.15 - 0.4 * min(1.0, t / len)
+                    ph += 2 * PI * f0 * slide * (1 + 0.012 * sin(2 * PI * vib * t)) / SAMPLE_RATE
+                    val env = min(1.0, t / 0.08) * (1 - t / len)
+                    val tone = sin(ph) + 0.45 * sin(2 * ph) + 0.25 * sin(3 * ph) // "aah"
+                    buf[idx] += (0.11 * tone * env).toFloat()
+                }
+            }
+            return pcm(buf, if (cheer) 0.85f else 0.7f)
+        }
+
+        /** Window smash: a crack, then a shower of high glassy pings. */
+        fun glass(): ShortArray {
+            val n = samples(0.75)
+            val buf = FloatArray(n)
+            val rnd = Random(41)
+            for (i in 0 until n) {
+                val t = i.toDouble() / SAMPLE_RATE
+                buf[i] = (rnd.nextGaussian() * exp(-t * 60) * 0.9).toFloat()
+            }
+            for (k in 0 until 26) {
+                val s0 = samples(rnd.nextDouble() * 0.45)
+                val f = 2200.0 + rnd.nextDouble() * 4200.0
+                val a = 0.25 + 0.5 * rnd.nextDouble()
+                for (j in 0 until samples(0.2)) {
+                    val idx = s0 + j
+                    if (idx >= n) break
+                    val t = j.toDouble() / SAMPLE_RATE
+                    buf[idx] += (a * sin(2 * PI * f * t) * exp(-t * 28)).toFloat()
+                }
+            }
+            return pcm(buf, 0.85f)
+        }
+
+        /** Ball pitching on the hard gully road. */
+        fun bounce(): ShortArray {
+            val n = samples(0.14)
+            val buf = FloatArray(n)
+            val rnd = Random(43)
+            var phase = 0.0
+            for (i in 0 until n) {
+                val t = i.toDouble() / SAMPLE_RATE
+                phase += 2 * PI * (150.0 + 260.0 * exp(-t * 60)) / SAMPLE_RATE
+                buf[i] = (sin(phase) * exp(-t * 35) + 0.5 * rnd.nextGaussian() * exp(-t * 500)).toFloat()
+            }
+            return pcm(buf, 0.75f)
+        }
+
+        /** The bat cutting the air. */
+        fun swish(): ShortArray {
+            val n = samples(0.26)
+            val buf = FloatArray(n)
+            val rnd = Random(47)
+            var lp = 0.0
+            var prev = 0.0
+            for (i in 0 until n) {
+                val t = i.toDouble() / SAMPLE_RATE
+                val k = 0.05 + 0.4 * sin(PI * t / 0.26) // filter opens and closes = "whoosh"
+                lp += k * (rnd.nextGaussian() - lp)
+                val hp = lp - prev
+                prev = lp
+                val env = sin(PI * t / 0.26)
+                buf[i] = ((lp * 0.6 + hp * 1.5) * env * env).toFloat()
             }
             return pcm(buf, 0.7f)
         }

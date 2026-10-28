@@ -74,6 +74,8 @@ class BullseyeActivity : AppCompatActivity() {
             }
         }
 
+        gameView.onAutoFired = { tracker?.cancelDraw() }
+
         findViewById<WeaponIconView>(R.id.iconBow).weapon = Weapon.BOW
         findViewById<WeaponIconView>(R.id.iconSling).weapon = Weapon.SLINGSHOT
         findViewById<TextView>(R.id.bestBow).text = bestLabel(Weapon.BOW)
