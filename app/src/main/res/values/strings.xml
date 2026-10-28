@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Swar Hands</string>
+    <string name="mode_pinch">Pinch mode</string>
+    <string name="mode_air">Air keys</string>
+    <string name="hint_pinch">Touch thumb to a fingertip\nLeft hand: Index Sa · Middle Re · Ring Ga · Pinky Ma\nRight hand: Index Pa · Middle Dha · Ring Ni · Pinky Sa\'</string>
+    <string name="hint_air">Raise your index finger into a key at the top to play it.\nSlide across the keys for a sargam run.</string>
+    <string name="home_tagline">Play music and games with your hands ✋</string>
+    <string name="section_music">MUSIC</string>
+    <string name="section_games">GAMES</string>
+    <string name="badge_play">PLAY</string>
+    <string name="badge_soon">SOON</string>
+    <string name="play_again">Play again</string>
+    <string name="games">Games</string>
+</resources>

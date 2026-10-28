@@ -1,0 +1,11 @@
+<resources>
+    <style name="HomeSection">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">28dp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.15</item>
+        <item name="android:textColor">#9FA8DA</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+</resources>
