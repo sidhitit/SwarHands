@@ -5,11 +5,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import kotlin.math.hypot
 
 /**
  * Draws each [Sign] from plain shapes (no bitmaps): a cartoon hand palm facing you like your
- * own mirrored hand on screen, two hands for 6–10, a heart, or the outline of a shape to draw.
+ * own mirrored hand on screen, two hands for 6–10, or a heart.
  * Each hand part gets a dark outline then its fill, back to front: fingers, palm, thumb.
  * Paints, paths and rects are reused.
  */
@@ -22,17 +21,9 @@ class SignPainter {
     }
     private val r = RectF()
     private val path = Path()
-    private val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
 
-    /**
-     * Any sign, about [size] tall at (cx, cy). For shapes, [trace] in 0..1 moves a pointing hand
-     * along the outline to show how to draw it (negative = no hand).
-     */
-    fun icon(c: Canvas, sign: Sign, cx: Float, cy: Float, size: Float, alpha: Int = 255, trace: Float = -1f) {
+    /** Any sign, about [size] tall at (cx, cy). */
+    fun icon(c: Canvas, sign: Sign, cx: Float, cy: Float, size: Float, alpha: Int = 255) {
         when (sign.kind) {
             SignKind.HAND -> draw(c, sign, cx, cy, size, alpha)
             SignKind.TWO_HANDS -> if (sign == Sign.HEART) heart(c, cx, cy, size, alpha) else {
@@ -40,7 +31,6 @@ class SignPainter {
                 draw(c, Sign.FIVE, cx - size * 0.24f, cy, k, alpha)
                 Sign.fingers(sign.number - 5)?.let { draw(c, it, cx + size * 0.24f, cy, k, alpha) }
             }
-            SignKind.SHAPE -> shape(c, sign, cx, cy, size, alpha, trace)
         }
     }
 
@@ -69,47 +59,6 @@ class SignPainter {
         }
     }
 
-    private fun shape(c: Canvas, sign: Sign, cx: Float, cy: Float, size: Float, alpha: Int, trace: Float) {
-        val pts = ShapeRecognizer.outline(sign) ?: return
-        val k = size * 0.33f
-        path.reset()
-        path.moveTo(cx + pts[0] * k, cy + pts[1] * k)
-        for (i in 1 until pts.size / 2) path.lineTo(cx + pts[i * 2] * k, cy + pts[i * 2 + 1] * k)
-        pen.color = OUTLINE
-        pen.alpha = alpha
-        pen.strokeWidth = size * 0.1f
-        c.drawPath(path, pen)
-        pen.color = SHAPE_BLUE
-        pen.alpha = alpha
-        pen.strokeWidth = size * 0.065f
-        c.drawPath(path, pen)
-        if (trace < 0f) return
-
-        // the point [trace] of the way along the outline
-        var total = 0f
-        for (i in 1 until pts.size / 2) total += hypot(pts[i * 2] - pts[i * 2 - 2], pts[i * 2 + 1] - pts[i * 2 - 1])
-        var want = total * (trace % 1f)
-        var px = pts[0]
-        var py = pts[1]
-        for (i in 1 until pts.size / 2) {
-            val seg = hypot(pts[i * 2] - pts[i * 2 - 2], pts[i * 2 + 1] - pts[i * 2 - 1])
-            if (want <= seg && seg > 0f) {
-                val f = want / seg
-                px = pts[i * 2 - 2] + (pts[i * 2] - pts[i * 2 - 2]) * f
-                py = pts[i * 2 - 1] + (pts[i * 2 + 1] - pts[i * 2 - 1]) * f
-                break
-            }
-            want -= seg
-        }
-        val dx = cx + px * k
-        val dy = cy + py * k
-        fill.color = Color.WHITE
-        fill.alpha = alpha
-        c.drawCircle(dx, dy, size * 0.05f, fill)
-        // pointing hand with its fingertip on the dot
-        val hs = size * 0.42f
-        draw(c, Sign.ONE, dx + 0.21f * hs, dy + 0.48f * hs, hs, alpha)
-    }
     private var s = 1f
     private var stroke = 1f
 
@@ -199,7 +148,6 @@ class SignPainter {
     companion object {
         val SKIN = Color.parseColor("#FFCC80")
         val HEART = Color.parseColor("#FF4F81")
-        val SHAPE_BLUE = Color.parseColor("#29B6F6")
         val OUTLINE = Color.parseColor("#5D4037")
         private const val THUMB = 1 shl 4
         private val FX = floatArrayOf(-0.21f, -0.07f, 0.07f, 0.21f)

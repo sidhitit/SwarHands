@@ -17,7 +17,7 @@ import com.demo.swarhands.tracking.HandCamera
 import com.google.android.material.button.MaterialButton
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 
-/** Sign Says: watch a sequence of hand signs and shapes, then repeat it. Two hands are tracked. */
+/** Sign Says: watch a sequence of hand signs, then repeat it. Two hands are tracked. */
 class SignActivity : AppCompatActivity() {
 
     private lateinit var previewView: PreviewView

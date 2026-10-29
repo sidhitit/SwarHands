@@ -9,9 +9,9 @@ import kotlin.random.Random
  * Pure game logic (no drawing). Driven by [update] once per rendered frame on the UI thread.
  *
  * Simon-style memory: watch a sequence of hand signs, then repeat it in order. Hold each sign
- * until the ring fills to lock it in (so passing through a pose never counts); shapes are drawn
- * in the air and count as soon as the drawing is recognised. Each cleared round adds one sign;
- * later rounds unlock harder signs (two-hand numbers, the heart, shapes) and show them faster.
+ * until the ring fills to lock it in (so passing through a pose never counts). Each cleared
+ * round adds one sign; later rounds unlock harder signs (two-hand numbers, the heart) and
+ * show them faster.
  * A wrong sign or running out of time costs a life and replays the same sequence.
  */
 class SignGame(var bestScore: Int, var bestRound: Int, private val listener: Listener) {
@@ -53,11 +53,7 @@ class SignGame(var bestScore: Int, var bestRound: Int, private val listener: Lis
     var wrongSign: Sign? = null; private set
     var expected: Sign? = null; private set
 
-    /** When a drawing wasn't recognised (for the "try again" flash). */
-    var strokeFailAt = 0L; private set
-
     private var holdSince = 0L
-    private var lastStrokeSeq = Int.MIN_VALUE
     private var needChange = false
     private var lastShown = -1
     private var started = false
@@ -76,14 +72,12 @@ class SignGame(var bestScore: Int, var bestRound: Int, private val listener: Lis
     fun update(now: Long, state: SignState?) {
         if (!started) restart(now)
         val sign = state?.sign
-        // drawings finished while watching don't count
-        if (phase != Phase.INPUT && state != null) lastStrokeSeq = state.strokeSeq
         val t = now - phaseStart
         when (phase) {
             Phase.INTRO -> if (t >= INTRO_MS) startShow(now)
             Phase.SHOW -> updateShow(now, t)
             Phase.GO -> if (t >= GO_MS) startInput(now)
-            Phase.INPUT -> updateInput(now, sign, state)
+            Phase.INPUT -> updateInput(now, sign)
             Phase.ROUND_CLEAR -> if (t >= ROUND_CLEAR_MS) {
                 sequence += pick()
                 startShow(now)
@@ -140,24 +134,7 @@ class SignGame(var bestScore: Int, var bestRound: Int, private val listener: Lis
         enter(Phase.INPUT, now)
     }
 
-    private fun updateInput(now: Long, sign: Sign?, state: SignState?) {
-        // a finished drawing: recognised shapes lock in straight away
-        if (state != null && state.strokeSeq != lastStrokeSeq) {
-            val fresh = lastStrokeSeq != Int.MIN_VALUE
-            lastStrokeSeq = state.strokeSeq
-            if (fresh) {
-                val shape = state.strokeShape
-                if (shape != null) {
-                    lock(shape, now)
-                    return
-                }
-                strokeFailAt = now
-                listener.onSfx(Sfx.MISS, 0.6f)
-            }
-        }
-        // the clock waits while you draw
-        if (state?.drawing == true) stepStart = max(stepStart, now - STEP_MS + DRAW_GRACE_MS)
-
+    private fun updateInput(now: Long, sign: Sign?) {
         // the same sign twice in a row needs the hand to change in between
         if (needChange && sign != lastLocked) needChange = false
 
@@ -256,7 +233,6 @@ class SignGame(var bestScore: Int, var bestRound: Int, private val listener: Lis
         const val MISTAKE_MS = 2200L
         const val HOLD_MS = 650L
         const val STEP_MS = 7000L
-        private const val DRAW_GRACE_MS = 2500L
         private const val LEAD_MS = 400L
         private const val GAP_MS = 320L
         private const val BASE_CARD_MS = 1150L

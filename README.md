@@ -56,9 +56,6 @@ throw your move. First to 2 wins (best of 3). Your opponent is a white cartoon g
   or 7 s without one costs a life and replays the round.
 - Signs: 1–5 fingers, fist, 👍, 👎, 🤘, 🤙, 👌, plus two-hand 6–10 (5 + n) and the 🫶 heart.
   Reading them: `games/signs/Sign.kt` (`SignClassifier`). Hands cut off by the screen edge are ignored.
-- Shapes (○ □ △ ⚡ ★) are drawn in the air with one pointing finger; hold still to finish.
-  A held, still ☝ is the "One" sign, a moving one draws. Recognizer: `games/signs/ShapeRecognizer.kt`
-  ($1-style template matching, plus a corner count to tell squares from circles).
 - Rounds, timings and scoring: constants in `games/signs/SignGame.kt`
 
 ## Tuning

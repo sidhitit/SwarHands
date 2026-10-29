@@ -180,7 +180,6 @@ class SignView @JvmOverloads constructor(
         val s = state
 
         g.update(now, s)
-        trackStroke(s, now)
         val phase = g.phase
         val t = now - g.phaseStart
         val w = width.toFloat()
@@ -189,7 +188,6 @@ class SignView @JvmOverloads constructor(
         c.drawRect(0f, 0f, w, h * 0.3f, topScrim)
         c.drawRect(0f, h * 0.65f, w, h, bottomScrim)
         drawHand(c, s, phase)
-        if (phase == Phase.INPUT) drawTrail(c, s, now)
         drawHud(c, g, w, now)
         drawSlots(c, g, w, now)
 
@@ -220,54 +218,6 @@ class SignView @JvmOverloads constructor(
             for ((i, j) in HandSkeleton.BONES) c.drawLine(pts[i].x, pts[i].y, pts[j].x, pts[j].y, strokePaint)
             fillPaint.color = if (active) YOU else Color.argb(90, 79, 195, 247)
             for (k in TIP_IDS) c.drawCircle(pts[k].x, pts[k].y, dp(if (active) 5f else 3.5f), fillPaint)
-        }
-    }
-
-    // ---------- drawing in the air ----------
-
-    /** Keeps the last trail around after the drawing ends so it can flash green or red. */
-    private fun trackStroke(s: SignState?, now: Long) {
-        if (s == null) return
-        val live = s.stroke
-        if (s.drawing && live != null) {
-            if (trail.size < live.size) trail = FloatArray(live.size * 2)
-            System.arraycopy(live, 0, trail, 0, live.size)
-            trailN = s.strokeCount
-            trailEndAt = 0L
-        }
-        if (s.strokeSeq != trailSeq) {
-            trailSeq = s.strokeSeq
-            trailEndAt = now
-            trailOk = s.strokeShape != null
-        }
-    }
-
-    private fun drawTrail(c: Canvas, s: SignState?, now: Long) {
-        val drawingNow = s?.drawing == true
-        val since = now - trailEndAt
-        if (!drawingNow && (trailEndAt == 0L || since > 700)) return
-        if (trailN < 2) return
-        val a = if (drawingNow) 255 else (255 * (1f - since / 700f)).toInt()
-        val color = when {
-            drawingNow -> YOU
-            trailOk -> WIN_GREEN
-            else -> LOSE_RED
-        }
-        trailPath.reset()
-        trailPath.moveTo(trail[0], trail[1])
-        for (i in 1 until trailN) trailPath.lineTo(trail[i * 2], trail[i * 2 + 1])
-        strokePaint.strokeJoin = Paint.Join.ROUND
-        strokePaint.strokeWidth = dp(16f)
-        strokePaint.color = color
-        strokePaint.alpha = a * 70 / 255
-        c.drawPath(trailPath, strokePaint)
-        strokePaint.strokeWidth = dp(6f)
-        strokePaint.color = Color.WHITE
-        strokePaint.alpha = a
-        c.drawPath(trailPath, strokePaint)
-        if (drawingNow) {
-            fillPaint.color = Color.WHITE
-            c.drawCircle(trail[trailN * 2 - 2], trail[trailN * 2 - 1], dp(8f), fillPaint)
         }
     }
 
@@ -319,12 +269,6 @@ class SignView @JvmOverloads constructor(
     }
 
     private val heartPath = Path()
-    private val trailPath = Path()
-    private var trail = FloatArray(800)
-    private var trailN = 0
-    private var trailSeq = Int.MIN_VALUE
-    private var trailEndAt = 0L
-    private var trailOk = false
 
     /** One slot per sign in the sequence: ✓ done, ? still to come, the current one pulses. */
     private fun drawSlots(c: Canvas, g: SignGame, w: Float, now: Long) {
@@ -379,8 +323,7 @@ class SignView @JvmOverloads constructor(
         val p2 = ((t - 250) / 400f).coerceIn(0f, 1f)
         text(c, "Watch the signs…", w / 2f, cy + dp(6f), sp(20f), Color.WHITE, (a * p2).toInt())
         text(c, "then repeat them in order", w / 2f, cy + dp(34f), sp(20f), Color.WHITE, (a * p2).toInt())
-        text(c, "Hold each sign until the ring fills", w / 2f, cy + dp(66f), sp(14f), SOFT_WHITE, (a * p2).toInt())
-        text(c, "Shapes: draw them with one finger ☝", w / 2f, cy + dp(88f), sp(14f), SOFT_WHITE, (a * p2).toInt())
+        text(c, "Hold each sign until the ring fills", w / 2f, cy + dp(72f), sp(14f), SOFT_WHITE, (a * p2).toInt())
     }
 
     private fun drawShow(c: Canvas, g: SignGame, now: Long, w: Float, h: Float) {
@@ -396,19 +339,18 @@ class SignView @JvmOverloads constructor(
         val cy = h * 0.47f
         val cw = min(w * 0.72f, dp(300f)) * k
         val ch = cw * 1.25f
-        drawSignCard(c, sign, w / 2f, cy, cw, a, GOLD, (t / g.cardMs.toFloat()) * 1.1f)
+        drawSignCard(c, sign, w / 2f, cy, cw, a, GOLD)
     }
 
-    /** A sign on a card: picture, number badge, title and (for two hands / shapes) a hint. */
-    private fun drawSignCard(c: Canvas, sign: Sign, cx: Float, cy: Float, cw: Float, a: Int, border: Int, trace: Float = -1f) {
+    /** A sign on a card: picture, number badge, title and (for two hands) a hint. */
+    private fun drawSignCard(c: Canvas, sign: Sign, cx: Float, cy: Float, cw: Float, a: Int, border: Int) {
         val ch = cw * 1.25f
         drawCard(c, cx, cy, cw, ch, a, border)
-        painter.icon(c, sign, cx, cy - ch * 0.07f, cw * 0.74f, a, if (sign.kind == SignKind.SHAPE) trace else -1f)
+        painter.icon(c, sign, cx, cy - ch * 0.07f, cw * 0.74f, a)
         if (sign.number > 0) badge(c, sign.number, cx + cw * 0.36f, cy - ch * 0.38f, cw * 0.13f, a)
         val hasHint = sign.hint.isNotEmpty()
         val titleY = if (hasHint) cy + ch * 0.33f else cy + ch * 0.4f
-        val title = if (sign.kind == SignKind.SHAPE) DRAW_TITLE[sign.ordinal] else sign.title
-        text(c, title, cx, titleY, cw * 0.1f, DARK, a, outline = false)
+        text(c, sign.title, cx, titleY, cw * 0.1f, DARK, a, outline = false)
         if (hasHint) text(c, sign.hint, cx, cy + ch * 0.43f, cw * 0.055f, Color.parseColor("#5D5D5D"), a, outline = false)
     }
 
@@ -459,16 +401,8 @@ class SignView @JvmOverloads constructor(
             rect.set(cx - r, cy - r, cx + r, cy + r)
             c.drawArc(rect, -90f, 360f * g.holdProgress, false, strokePaint)
         }
-        // a drawing that wasn't recognised
-        if (now - g.strokeFailAt < 1200) {
-            text(c, "Didn't catch that shape, try again", w / 2f, h * 0.42f, sp(17f), LOSE_RED)
-        }
         when {
             s == null || s.hands.isEmpty() -> text(c, "Show your hand ✋", cx, cy + r + dp(24f), sp(15f), SOFT_WHITE)
-            s.drawing -> {
-                text(c, "✍", cx, cy, sp(40f), YOU, outline = false)
-                text(c, "Drawing… hold still to finish", cx, cy + r + dp(24f), sp(15f), YOU)
-            }
             s.partial -> {
                 text(c, "↕", cx, cy, sp(40f), GOLD, outline = false)
                 text(c, "Move your whole hand into view", cx, cy + r + dp(24f), sp(15f), GOLD)
@@ -493,7 +427,7 @@ class SignView @JvmOverloads constructor(
         val cy = h * 0.52f
         val cw = min(w * 0.5f, dp(220f))
         text(c, "It was", w / 2f, cy - cw * 0.73f, sp(15f), SOFT_WHITE, a)
-        drawSignCard(c, exp, w / 2f, cy, cw, a, WIN_GREEN, ((t % 2000) / 2000f))
+        drawSignCard(c, exp, w / 2f, cy, cw, a, WIN_GREEN)
         val line = if (wrong != null) "You showed: ${wrong.title}" else "Make each sign within 7 seconds"
         text(c, line, w / 2f, cy + cw * 0.95f, sp(15f), Color.WHITE, a)
         text(c, if (g.lives > 0) "Watch again…" else "", w / 2f, cy + cw * 0.95f + dp(28f), sp(14f), SOFT_WHITE, a)
@@ -614,7 +548,6 @@ class SignView @JvmOverloads constructor(
     private companion object {
         val NUM = Array(11) { it.toString() }
         val TIP_IDS = intArrayOf(4, 8, 12, 16, 20)
-        val DRAW_TITLE = Array(Sign.entries.size) { "Draw a ${Sign.entries[it].title.lowercase()}" }
         val GOLD = Color.parseColor("#FFD54F")
         val WIN_GREEN = Color.parseColor("#69F0AE")
         val LOSE_RED = Color.parseColor("#FF5252")
