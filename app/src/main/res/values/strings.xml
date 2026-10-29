@@ -32,4 +32,13 @@
     <string name="cricket_tip">Hold your hand up like a bat ✋ and swing as the ball reaches you.\nEarly = leg side, late = off side. Swing upwards to loft it for six!</string>
     <string name="switch_mode">Switch mode</string>
     <string name="try_again">Try again</string>
+    <string name="party_title">Haath Party 🎉</string>
+    <string name="choose_party_mode">Choose how to play</string>
+    <string name="mode_regular">Regular Fun</string>
+    <string name="mode_boss">Boss Mode</string>
+    <string name="badge_regular">CHILL</string>
+    <string name="badge_boss">HARD</string>
+    <string name="regular_desc">Quick 5-second games, one after another. It speeds up as you go.</string>
+    <string name="boss_desc">Fight 5 bosses with combos, special attacks, trick orders and mirror rounds.</string>
+    <string name="party_tip">Do what it says, fast! ✋\nTap EN | HI in the game to switch language.</string>
 </resources>

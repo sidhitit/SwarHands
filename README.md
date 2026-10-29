@@ -58,6 +58,19 @@ throw your move. First to 2 wins (best of 3). Your opponent is a white cartoon g
   Reading them: `games/signs/Sign.kt` (`SignClassifier`). Hands cut off by the screen edge are ignored.
 - Rounds, timings and scoring: constants in `games/signs/SignGame.kt`
 
+**Haath Party 🎉**: rapid-fire 5-second microgames. A one-word instruction flashes, you do it, next!
+Two modes, picked on the start screen:
+- **Regular Fun**: 10 microgames: Fist, High five, Count the apples, Thumbs up/down, Pinch the bee,
+  Catch the egg, Dodge, Pop the balloons, Copy the sign, Freeze. 4 lives; it speeds up every 4 games.
+- **Boss Mode**: fight 5 bosses in a row (Makkhi Raja, Gully Bowler, Sign Sorcerer, Kite Demon,
+  Mega Dragon). Each win hits the boss; win streaks build a combo (×1.5, ×2, ×3). Below half HP
+  a boss unleashes a special attack (bee swarm, batting, sign memory, kite flying). Later bosses
+  add "DON'T…!" fake-outs and mirror rounds. 5 hearts, +1 per boss beaten; beat them all and they
+  come back stronger. Boss games live in `games/party/BossGames.kt`.
+- English / Hinglish toggle (tap EN | HI under the score bar).
+- Shared hand input (sign, pinch, palm, fingertip, speed): `games/party/PartyInput.kt`.
+  Each microgame is one small class in `games/party/Microgames.kt`; add a new one there and list it in `PartyView`.
+
 ## Tuning
 - Pinch sensitivity: `PinchDetector(pinchOnRatio, pinchOffRatio)` in `gesture/PinchDetector.kt`.
 - Key band position: `TOP` / `BOTTOM` in `gesture/AirKeyboard.kt`.

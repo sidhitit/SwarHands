@@ -38,5 +38,9 @@
             android:name=".games.signs.SignActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".games.party.PartyActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>
